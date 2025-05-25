@@ -20,8 +20,8 @@ from fotoowl_app.views import *
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('users/create/', users_register.as_view(), name='users-register'),
-    path('users/login/', users_login.as_view(), name='users-login'),
+    path('users/create/', UserRegisterSerializer.as_view(), name='users-register'),
+    path('users/login/', UserLoginSerializer.as_view(), name='users-login'),
     path('users/listing/', UserListAPIView.as_view(), name='user-list'),
     path('book/list/', BookListAPIView.as_view(), name='book-create'),
     path('book/toborrow/', BookToBorrow.as_view(), name='book-borrow'),

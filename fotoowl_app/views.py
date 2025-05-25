@@ -8,84 +8,52 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import *
 from datetime import datetime
-
+from rest_framework import status
 
 def get_refresh_token(user):
     token = RefreshToken.for_user(user)
     
     return {'acsess': str(token.access_token), 'refresh': str(token)}
 
-class users_register(APIView):
-    permission_classes = (AllowAny, )
-    def post(self, request):
-        try:
-            error = {}
-            if not request.data:
-                return JsonResponse({'error': True, "statusCode": 422, "message": "Data is required"}, status=422)
-            if not request.data.get('email'):
-                error['email'] = "This fields is required."
-            if not request.data.get('password'):
-                error['password'] = "This fields is required."
-            if bool(error):
-                return JsonResponse(
-                    {'error': True, "statusCode": 422, "message": "Something went wrong", 'errors': error}, status=422)
-        
-            email = request.data['email']
-            password = request.data['password']
+class UserRegisterView(APIView):
+    permission_classes = (AllowAny,)
 
-            try:
-                user = User.objects.get(email=email)
-                return JsonResponse({'error': True, "statusCode": 422, "message": "email is already exist", 'errors': error}, status=422)
-            except User.DoesNotExist:
-                user = User.objects.create(email=email)
-                user.set_password(password)
-                user.save()
-                return JsonResponse({'error': False, "statusCode": 201, "message": "register is done"}, status=201)
-
-        except KeyError as e:
-            return JsonResponse({"error": True, "statusCode": 500, "message": "Something Went Wrong"}, status=500)
-        except Exception as e:
-            return JsonResponse({"error": True, "statusCode": 500, "message": "Something Went Wrong"}, status=500)
-        
-class users_login(APIView):
-    permission_classes = (AllowAny, )
     def post(self, request):
-        try:
-            error = {}
-            if not request.data:
-                return JsonResponse({'error': True, "statusCode": 422, "message": "Data is required"}, status=422)
-            if not request.data['email']:
-                error['email'] = "This fields is required."
-            if not request.data['password']:
-                error['password'] = "This fields is required."
-            if bool(error):
-                return JsonResponse(
-                    {'error': True, "statusCode": 422, "message": "Something went wrong", 'errors': error}, status=422)
-                
-            email = request.data['email']
-            password = request.data['password']
-            
+        serializer = UserRegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse({"error": False,"statusCode": 201, "message": "Registration successful"}, status=status.HTTP_201_CREATED)
+        
+        return JsonResponse({"error": True,"statusCode": 422,"message": "Validation failed","errors": serializer.errors}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+class UserLoginView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request):
+        serializer = UserLoginSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            password = serializer.validated_data['password']
             try:
                 user = User.objects.get(email=email)
                 if user.check_password(password):
-                    access_token = get_refresh_token(user)
-                    return JsonResponse({"error": False,"statusCode": 200,"message": "Successfully Login","data": {'id': user.id,'email': user.email, }, 'token': access_token})
+                    token = get_refresh_token(user)
+                    return JsonResponse({"error": False,"statusCode": 200,"message": "Login successful","data": {"id": user.id,"email": user.email},"token": token}, status=status.HTTP_200_OK)
                 else:
-                    return JsonResponse({"error": True, "statusCode": 500, "message": "password is wrong"}, status=500)
+                    return JsonResponse({"error": True,"statusCode": 401,"message": "Incorrect password"}, status=status.HTTP_401_UNAUTHORIZED)
             except User.DoesNotExist:
-                return JsonResponse({"error": True, "statusCode": 500, "message": "email is not registered"}, status=500)
-        except Exception as e:
-            return JsonResponse({"error": True, "statusCode": 500, "message": "Something Went Wrong"}, status=500)
+                return JsonResponse({"error": True,"statusCode": 404,"message": "Email not registered"}, status=status.HTTP_404_NOT_FOUND)
+        return JsonResponse({"error": True,"statusCode": 422,"message": "Validation failed","errors": serializer.errors}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
 class UserListAPIView(ListAPIView):
     queryset = User.objects.all()
-    serializer_class = UserSerializer
+    serializer_class = UserLoginView
 
 #For others
 class BookListAPIView(ListAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Book.objects.filter(is_borrow=False)
-    serializer_class = BookListSerializer 
+    serializer_class = BookSerializer 
 
 class BookToBorrow(APIView):
     permission_classes = (IsAuthenticated, )
